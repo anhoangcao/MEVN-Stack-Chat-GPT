@@ -17,7 +17,30 @@
   import { ref } from 'vue';
   const question = ref('');
 
-  const fetchAnswer = () => {
-    console.log(question.value);
+  const fetchAnswer = async () => {
+  try {
+    const res = await fetch('http://localhost:8000', {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: question.value,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server error: ${res.status} - ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    console.log(data.bot); // assuming the server response has a 'bot' property
+
+  } catch (error) {
+    console.error('Error fetching answer:', error);
   }
+
+  console.log(question.value);
+};
+
 </script>
