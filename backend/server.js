@@ -1,44 +1,62 @@
 import express from "express";
-import * as dotenv from "dotenv";
+import dotenv from "dotenv";
 import cors from "cors";
-import openai from "openai";
+import axios from 'axios';
 
-const configuration = {
-  apiKey: process.env.OPEN,
-};
-const openaiInstance = new openai.OpenAIApi(configuration);
-
-
-
-// console.log(process.env.OPENAI_KEY);
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post("/", async (req, res) => {
+app.post('/getOpenAIResponse', async (req, res) => {
   try {
-    const question = req.body.question;
+    console.log('Received request:', req.body); // Log the incoming request
 
-    const response = await openaiInstance.createCompletion({
-      model: "text-davinci-003",
-      prompt: `${question}`,
-      temperature: 0, // Higher values means the model will take more risks.
-      max_tokens: 3000, // The maximum number of tokens to generate in the completion. Most models have a context length of 2048 tokens (except for the newest models, which support 4096).
-      top_p: 1, // alternative to sampling with temperature, called nucleus sampling
-      frequency_penalty: 0.5, // Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
-      presence_penalty: 0, // Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.
-    });
-    // console.log(response);
-    res.status(200).send({
-      bot: response.data.choices[0].text,
-    });
+    const openaiResponse = await axios.post(
+      'https://api.openai.com/v1/completions',
+      {
+        model: 'text-davinci-003',
+        prompt: req.body.question, // Use the question from the client
+        temperature: 0,
+        max_tokens: 3000,
+        top_p: 1,
+        frequency_penalty: 0.5,
+        presence_penalty: 0,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`, // Replace with your actual OpenAI API key
+        },
+      }
+    );
+
+    console.log('OpenAI Response:', openaiResponse.data); // Log the OpenAI response
+
+    res.json(openaiResponse.data);
   } catch (error) {
-    // console.error(error);
-    res.status(500).send(error || "Something went wrong");
+    console.error('Error fetching OpenAI response:', error);
+
+    if (error.response) {
+      // The request was made and the server responded with a non-2xx status code
+      console.error('OpenAI API Error:', error.response.data);
+      res.status(error.response.status).json({ error: error.response.data });
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response from OpenAI API');
+      res.status(500).json({ error: 'No response from OpenAI API' });
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('Error setting up OpenAI request:', error.message);
+      res.status(500).json({ error: 'Error setting up OpenAI request' });
+    }
   }
 });
 
-app.listen(8000, () => {
-  console.log("App is running");
+
+const PORT = process.env.PORT || 8000;
+
+app.listen(PORT, () => {
+  console.log(`App is running on port ${PORT}`);
 });

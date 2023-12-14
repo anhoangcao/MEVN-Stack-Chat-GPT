@@ -1,46 +1,54 @@
 <template>
   <main>
     <div id="chat_container">
-      <div v-for="(chat, i) in wrapper" :key="i" class="wrapper" :class="{ ai: chat.isAi }">
+      <div v-for="(chat, i) in wrapper" :key="i" :class="{ ai: chat.isAi }" class="wrapper">
         <Chat :chat="chat" :key="i" />
       </div>
     </div>
     <form @submit.prevent="fetchAnswer">
-      <textarea rows="1" cols="1" placeholder="Type your question here..." v-model="question"></textarea>
-      <button type="submit"><img src="@/assets/send.svg" alt="send" /></button>
+      <textarea rows="1" cols="1" placeholder="Ask VueChat..." v-model="question"></textarea>
+      <button type="submit" :disabled="loading">
+        <img src="@/assets/send.svg" alt="send" />
+      </button>
     </form>
   </main>
 </template>
 
-
 <script setup>
-  import { ref } from 'vue';
-  const question = ref('');
+import { ref } from "vue";
+import Chat from "@/components/Chat.vue";
+import axios from 'axios';
 
-  const fetchAnswer = async () => {
+const question = ref("");
+const wrapper = ref([]);
+const loading = ref(false);
+
+const fetchAnswer = async () => {
   try {
-    const res = await fetch('http://localhost:8000', {
-      method: 'POST',
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question: question.value,
-      }),
-    });
+    loading.value = true;
+    wrapper.value.push({ isAi: false, value: question.value });
+    wrapper.value.push({ isAi: true, value: "Loading...." });
 
-    if (!res.ok) {
-      throw new Error(`Server error: ${res.status} - ${res.statusText}`);
-    }
+    const response = await axios.post(
+      "http://localhost:8000/getOpenAIResponse",
+      { question: question.value },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.OPENAI_KEY}`,
+        },
+      }
+    );
 
-    const data = await res.json();
-    console.log(data.bot); // assuming the server response has a 'bot' property
+    const parsedData = (response.data && typeof response.data === 'string') ? response.data.trim() : response.data;
 
+    wrapper.value.pop();
+    wrapper.value.push({ isAi: true, value: parsedData });
   } catch (error) {
-    console.error('Error fetching answer:', error);
+    console.error('Error fetching OpenAI response:', error);
+  } finally {
+    loading.value = false;
+    question.value = "";
   }
-
-  console.log(question.value);
 };
-
 </script>
